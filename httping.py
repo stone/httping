@@ -112,7 +112,8 @@ class HTTPing:
 
 def main():
     usage = "usage: %prog [options] url"
-    parser = OptionParser(usage=usage)
+    version = "%%prog %s" % __VERSION__
+    parser = OptionParser(usage=usage, version=version)
     parser.add_option("-d", "--debug",
                   action="store_true", dest="debug", default=False,
                   help="make lots of noise")
@@ -131,7 +132,7 @@ def main():
     (options, args) = parser.parse_args()
 
     if len(args) < 1:
-        print "need http://hostname"
+        print parser.error("need a url to ping, -h/--help for help")
         raise SystemExit
 
     if args[0][:7] != "http://":
