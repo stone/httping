@@ -46,8 +46,13 @@ class HTTPing:
         cnt = 0
         for x in range(0, int(self.count)):
             cnt += 1
-            (tt,code,reason) = self.http_connect()
-
+            if self.url_parsed.scheme == 'http':
+                (tt,code,reason) = self.http_connect()
+            elif self.url_parsed.scheme == 'https':
+                (tt,code,reason) = self.https_connect()
+            else:
+                print "url needs to start with 'http:// or https://'"
+                raise SystemExit
             if tt is None:
                 self.fail += 1
                 continue
@@ -98,6 +103,32 @@ class HTTPing:
         ttime = etime - stime
         milis = ttime.microseconds/1000
         return (milis, resp_code, resp_reason)
+    
+    def https_connect(self):
+        try:
+            conn = httplib.HTTPSConnection(self.url_parsed.netloc,
+                    port=self.url_parsed.port,
+                    timeout=30)
+        except TypeError:
+            conn = httplib.HTTPSConnection(self.url_parsed.netloc,
+                    port=self.url_parsed.port)
+        try:
+            conn.set_debuglevel(self.debug)
+            stime = datetime.now()
+            conn.request('HEAD', "/", None, {'User-Agent':USER_AGENT})
+            resp = conn.getresponse()
+            etime = datetime.now()
+            resp_code = resp.status
+            resp_reason = resp.reason
+            if self.server_header is None:
+                self.server_header = resp.getheaders()
+        except Exception, e:
+            return (None,None,None)
+        finally:
+            conn.close()
+        ttime = etime - stime
+        milis = ttime.microseconds/1000
+        return (milis, resp_code, resp_reason)
 
     def report(self):
         _num = len(self.totals)
@@ -135,8 +166,8 @@ def main():
         print parser.error("need a url to ping, -h/--help for help")
         raise SystemExit
 
-    if args[0][:7] != "http://":
-        print "url needs to start with 'http://'"
+    if args[0][:7] != "http://" and args[0][:8] != "https://":
+        print "url needs to start with 'http:// or https://'"
         raise SystemExit
 
     hping = HTTPing(args[0], options.count, options.debug,
