@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*-
 #!/usr/bin/python2.5
 """
 httping - Ping like tool for http, display return-code, latency etc
@@ -167,7 +168,7 @@ def main():
         raise SystemExit
 
     if args[0][:7] != "http://" and args[0][:8] != "https://":
-        print "url needs to start with 'http:// or https://'"
+        print "url needs to start with 'http://' or 'https://'"
         raise SystemExit
 
     hping = HTTPing(args[0], options.count, options.debug,
