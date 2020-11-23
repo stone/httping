@@ -7,11 +7,18 @@ under the terms of the GNU General Public License (GPL).
 
 Originally from: https://github.com/stone/httping
 """
-import httplib
+from __future__ import print_function
+try:
+    import httplib
+except ImportError:
+    from http import client as httplib
 import time
 import socket
 from datetime import datetime
-from urlparse import urlparse
+try:
+    from urlparse import urlparse
+except ImportError:
+    from urllib.parse import urlparse
 from argparse import ArgumentTypeError, ArgumentParser
 import math
 import sys
@@ -35,7 +42,7 @@ class HTTPing:
         self.server_header = None
         self.fail_codes = [500]
         self.urlparse()
-        self.timeout = timeout
+        self.timeout = float(timeout)
         self.report_interval = 60
         self.errorfail = errorfail
         self.sinterval = float(sinterval)
@@ -43,23 +50,30 @@ class HTTPing:
     def urlparse(self):
         self.url_parsed = urlparse(self.url)
 
+    def connection(self):
+        if self.url_parsed.scheme == 'https':
+            class_ = httplib.HTTPSConnection
+        else:
+            class_ = httplib.HTTPConnection
+        return class_(self.url_parsed.hostname,
+                      port=self.url_parsed.port,
+                      timeout=self.timeout)
+
     def ping(self):
         try:
             self.ip = socket.gethostbyname(self.url_parsed.hostname)
-        except socket.gaierror, e:
-            print "Error connecting to %s - %s" % (self.url_parsed.hostname, e)
+        except socket.gaierror as e:
+            print("Error connecting to %s - %s" % (self.url_parsed.hostname, e))
             raise SystemExit
         if not self.quiet:
-            print "HTTPING %s (%s)" % (self.url_parsed.hostname, self.ip)
+            print("HTTPING %s (%s)" % (self.url_parsed.hostname, self.ip))
 
         cnt = 0
 
         try:
-            conn = httplib.HTTPConnection(self.url_parsed.hostname,
-                                          port=self.url_parsed.port,
-                                          timeout=self.timeout)
+            conn = self.connection()
 
-        except Exception, e:
+        except Exception as e:
             raise Exception(e)
 
         while True:
@@ -72,22 +86,20 @@ class HTTPing:
                 #     self.fail += 1
                 #     #continue
                 if not self.quiet:
-                    print "%d bytes from %s (%s) seq=%s code=%s (%s) time=%s ms" % (sys.getsizeof(self.respsize), self.url_parsed.netloc, self.ip, cnt, code, reason, tt)
+                    print("%d bytes from %s (%s) seq=%s code=%s (%s) time=%s ms" % (sys.getsizeof(self.respsize), self.url_parsed.netloc, self.ip, cnt, code, reason, tt))
 
-            except Exception, e:
+            except Exception as e:
                 if self.errorfail:
                     raise Exception(e)
                 else:
                     self.failed += 1
-                    conn = httplib.HTTPConnection(self.url_parsed.hostname,
-                                                  port=self.url_parsed.port,
-                                                  timeout=self.timeout)
+                    conn = self.connection()
                     (tt, code, reason) = (None, None, e)
-                    print "ERROR from %s (%s) seq=%s code=%s (%s) time=%s ms" % (self.url_parsed.netloc, self.ip, cnt, code, reason, tt)
+                    print("ERROR from %s (%s) seq=%s code=%s (%s) time=%s ms" % (self.url_parsed.netloc, self.ip, cnt, code, reason, tt))
 
             if cnt % self.report_interval == 0:
                 hping.report()
-                print '-------'
+                print('-------')
             if not self.flood:
                 time.sleep(self.sinterval)
 
@@ -103,12 +115,12 @@ class HTTPing:
     def print_server_report(self):
 
         for x in self.server_header:
-            print "%s: %s" % x
+            print("%s: %s" % x)
 
     def http_connect(self, conn):
         conn.set_debuglevel(self.debug)
         stime = datetime.now()
-        conn.request('GET', "/ping/ping", None, {'User-Agent': USER_AGENT})
+        conn.request('GET', self.url_parsed.path, None, {'User-Agent': USER_AGENT})
         resp = conn.getresponse()
         # We don't use it but need read() here to do another http request
         self.respsize = resp.read()
@@ -123,6 +135,7 @@ class HTTPing:
         return (milis, resp_code, resp_reason)
 
     def average(self, s):
+        s = list(s)
         return sum(s) * 1.0 / len(s)
 
     def report(self):
@@ -133,9 +146,9 @@ class HTTPing:
         _variance = map(lambda x: (x - _avg)**2, self.totals) if len(self.totals) !=0 else 0
         _stdev = math.sqrt(self.average(_variance)) if len(self.totals) !=0 else 0
         _ok = _num - self.failed if len(self.totals) !=0 else 0
-        print "--- %s ping statistics ---" % self.url
-        print "%s total, %s ok, %s failed" % (_num, _ok, self.failed)
-        print "round-trip min/avg/max/stdev = %.3f/%.3f/%.3f/%.3f ms" % (_min, _avg, _max, _stdev)
+        print("--- %s ping statistics ---" % self.url)
+        print("%s total, %s ok, %s failed" % (_num, _ok, self.failed))
+        print("round-trip min/avg/max/stdev = %.3f/%.3f/%.3f/%.3f ms" % (_min, _avg, _max, _stdev))
 
 
 if __name__ == '__main__':
